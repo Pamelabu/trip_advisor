@@ -7,6 +7,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 import time
 from bs4 import BeautifulSoup
 import os
+from textblob import TextBlob
 
 # os.environ['REQUESTS_CA_BUNDLE'] = r'C:\Users\Pamela.Buchwald\Desktop\cacert.pem'
 
@@ -29,7 +30,6 @@ driver.find_element(By.XPATH, '/html/body/div[2]/div[2]/div/div[2]/div[1]/div/di
 for i in range(PAGE_AMOUNT):
     reviews_on_single_page= []
     more_buttons = driver.find_elements(By.CLASS_NAME,'CECjK')
-    print(len(more_buttons))
     for j in range(len(more_buttons)):
         if more_buttons[j].is_displayed():
             driver.execute_script('arguments[0].click();',more_buttons[j])
@@ -43,7 +43,42 @@ for i in range(PAGE_AMOUNT):
             continue #Jeśli nie znaleźliśmy spana z komentarzem to przejdzeimy do następnego elementu div
         review = review_span.get_text(strip=True)
         reviews_on_single_page.append(review)
-    print(reviews_on_single_page)
-    break
-    
+    reviews_amount = len(reviews_on_single_page)
+    page_ids = [i+1]*reviews_amount #damy i+1 żeby numerowało od 1 #tworzymy listę cyfr, lista ma taką długość jak reviews_amount
+    reviews.extend(reviews_on_single_page) # działa jak append tylko dla list, nie musimy dodawać pojedynczo
+    pages.extend(page_ids)
+    time.sleep(1)
+    page_button = driver.find_element(By.XPATH,'//*[@id="tab-data-qa-reviews-0"]/div/div[5]/div/div[11]/div[1]/div/div[1]/div[2]/div/a')
+    actions = ActionChains(driver) #tworzymy listę zadań
+    actions.move_to_element(page_button) #dodajemy zadania do listy jako move_to_element
+    actions.perform() #wykonujemy zadania w jednym ciągu
+    page_button.click()
+    time.sleep(1)
+driver.quit() # wychodzimy z pętli, bo wychodził po przejściu jednej strony
 
+data = {'ID':pages,'Comments':reviews} #Id i comment to nazwy kolumn
+
+df = pd.DataFrame(data)
+print(df.head(50))
+# df.to_excel('wynik_pobierania.xlsx',index=False)
+
+def analyze_text(text):
+    blob = TextBlob(text) #rozdzielna podany mu tekst na pasujące skrawki
+    sentiment = blob.sentiment.polarity #jakiś programista zrobil taka funkcje jak sentiment.polarity i aplikujemy ja na nasz teskt
+    if sentiment > 0:
+        return 'Positive'
+    elif sentiment < 0:
+        return 'Negative'
+    else:
+        return 'Neutral'
+#ta część uczenia maszynowego nazywa się NLP Natural Language Processing i polga na takim przetwarzaniu języka aby znaleźć w nim sens
+df['Sentiment'] = df['Comments'].apply(analyze_text)
+
+print(df.head(50))
+df.to_excel('wynik_pobierania.xlsx', index=False)
+
+conn = sqlite3.connect('comments.sqlite')
+
+df.to_sql('CommentsTable', conn, if_exists='append', index=False) #dodaje nam indeksy od 0
+
+conn.close()
