@@ -74,7 +74,6 @@ def analyze_text(text):
 #ta część uczenia maszynowego nazywa się NLP Natural Language Processing i polga na takim przetwarzaniu języka aby znaleźć w nim sens
 df['Sentiment'] = df['Comments'].apply(analyze_text)
 
-print(df.head(50))
 df.to_excel('wynik_pobierania.xlsx', index=False)
 
 conn = sqlite3.connect('comments.sqlite')
